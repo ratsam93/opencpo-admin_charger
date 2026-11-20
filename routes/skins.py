@@ -1,4 +1,5 @@
 """Skin gallery — browse, preview, and activate charge app skins."""
+import html as _html
 import json
 import logging
 import os
@@ -138,8 +139,8 @@ async def action_activate_skin(name: str):
 
 
 def _ok(msg: str) -> str:
-    return f'<div class="p-3 bg-green-900/50 border border-green-800 rounded text-green-300 text-sm">✓ {msg}</div>'
+    return f'<div class="p-3 bg-green-900/50 border border-green-800 rounded text-green-300 text-sm">✓ {_html.escape(str(msg))}</div>'
 
 
 def _err(msg: str) -> str:
-    return f'<div class="p-3 bg-red-900/50 border border-red-800 rounded text-red-300 text-sm">✗ {msg}</div>'
+    return f'<div class="p-3 bg-red-900/50 border border-red-800 rounded text-red-300 text-sm">✗ {_html.escape(str(msg))}</div>'

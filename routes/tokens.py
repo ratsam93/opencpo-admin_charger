@@ -1,4 +1,5 @@
 """Token and RFID management."""
+import html as _html
 from datetime import datetime
 
 from fastapi import APIRouter, Request
@@ -110,7 +111,7 @@ async def action_token_create(request: Request):
         await api("/tokens", method="POST", json=body)
         return HTMLResponse('<div class="p-2 bg-green-900/50 text-green-300 rounded text-sm">✅ Token created</div><script>setTimeout(()=>{closeModal("modal-create");location.href=location.pathname+"?t="+Date.now()},1200)</script>')
     except Exception as e:
-        return HTMLResponse(f'<div class="p-2 bg-red-900/50 text-red-300 rounded text-sm">Error: {e}</div>')
+        return HTMLResponse(f'<div class="p-2 bg-red-900/50 text-red-300 rounded text-sm">Error: {_html.escape(str(e))}</div>')
 
 
 @router.put("/action/token/update/{token_id}", response_class=HTMLResponse)
@@ -130,7 +131,7 @@ async def action_token_update(request: Request, token_id: str):
         await api(f"/tokens/{token_id}", method="PUT", json=body)
         return HTMLResponse('<div class="p-2 bg-green-900/50 text-green-300 rounded text-sm">✅ Saved</div>')
     except Exception as e:
-        return HTMLResponse(f'<div class="p-2 bg-red-900/50 text-red-300 rounded text-sm">Error: {e}</div>')
+        return HTMLResponse(f'<div class="p-2 bg-red-900/50 text-red-300 rounded text-sm">Error: {_html.escape(str(e))}</div>')
 
 
 @router.post("/action/token/block/{token_id}", response_class=HTMLResponse)
@@ -141,7 +142,7 @@ async def action_token_block(request: Request, token_id: str):
         await api(f"/tokens/{token_id}/block", method="POST", json={"reason": reason})
         return HTMLResponse('<div class="p-2 bg-yellow-900/50 text-yellow-300 rounded text-sm">🚫 Token blocked</div><script>setTimeout(()=>location.href=location.pathname+"?t="+Date.now(),1000)</script>')
     except Exception as e:
-        return HTMLResponse(f'<div class="p-2 bg-red-900/50 text-red-300 rounded text-sm">Error: {e}</div>')
+        return HTMLResponse(f'<div class="p-2 bg-red-900/50 text-red-300 rounded text-sm">Error: {_html.escape(str(e))}</div>')
 
 
 @router.post("/action/token/unblock/{token_id}", response_class=HTMLResponse)
@@ -150,7 +151,7 @@ async def action_token_unblock(request: Request, token_id: str):
         await api(f"/tokens/{token_id}/unblock", method="POST")
         return HTMLResponse('<div class="p-2 bg-green-900/50 text-green-300 rounded text-sm">✅ Token unblocked</div><script>setTimeout(()=>location.href=location.pathname+"?t="+Date.now(),1000)</script>')
     except Exception as e:
-        return HTMLResponse(f'<div class="p-2 bg-red-900/50 text-red-300 rounded text-sm">Error: {e}</div>')
+        return HTMLResponse(f'<div class="p-2 bg-red-900/50 text-red-300 rounded text-sm">Error: {_html.escape(str(e))}</div>')
 
 
 @router.post("/action/token/replace/{token_id}", response_class=HTMLResponse)
@@ -164,9 +165,9 @@ async def action_token_replace(request: Request, token_id: str):
         result = await api(f"/tokens/{token_id}/replace", method="POST",
                            json={"new_uid": new_uid, "label": label})
         new_id = result.get("new_id", "")
-        return HTMLResponse(f'<div class="p-2 bg-green-900/50 text-green-300 rounded text-sm">✅ Replaced → <a href="/tokens/{new_id}" class="underline">new token</a></div><script>setTimeout(()=>location.href=location.pathname+"?t="+Date.now(),2000)</script>')
+        return HTMLResponse(f'<div class="p-2 bg-green-900/50 text-green-300 rounded text-sm">✅ Replaced → <a href="/tokens/{_html.escape(str(new_id), quote=True)}" class="underline">new token</a></div><script>setTimeout(()=>location.href=location.pathname+"?t="+Date.now(),2000)</script>')
     except Exception as e:
-        return HTMLResponse(f'<div class="p-2 bg-red-900/50 text-red-300 rounded text-sm">Error: {e}</div>')
+        return HTMLResponse(f'<div class="p-2 bg-red-900/50 text-red-300 rounded text-sm">Error: {_html.escape(str(e))}</div>')
 
 
 @router.delete("/action/token/delete/{token_id}", response_class=HTMLResponse)
@@ -175,7 +176,7 @@ async def action_token_delete(request: Request, token_id: str):
         await api(f"/tokens/{token_id}", method="DELETE")
         return HTMLResponse('<div class="p-2 bg-red-900/50 text-red-300 rounded text-sm">🗑 Token revoked</div><script>setTimeout(()=>location.href=location.pathname+"?t="+Date.now(),1000)</script>')
     except Exception as e:
-        return HTMLResponse(f'<div class="p-2 bg-red-900/50 text-red-300 rounded text-sm">Error: {e}</div>')
+        return HTMLResponse(f'<div class="p-2 bg-red-900/50 text-red-300 rounded text-sm">Error: {_html.escape(str(e))}</div>')
 
 
 @router.post("/action/token/purge-test", response_class=HTMLResponse)
@@ -185,6 +186,6 @@ async def action_token_purge_test(request: Request):
         prefixes = ["STRESS-%", "SIM-%", "VAL-%", "CHAOS-%", "E2E-%"]
         result = await api("/tokens/purge-test", method="POST", json={"prefixes": prefixes})
         deleted = result.get("deleted", 0)
-        return HTMLResponse(f'<div class="p-2 bg-yellow-900/50 text-yellow-300 rounded text-sm">🗑 {deleted} test tokens removed</div><script>setTimeout(()=>location.href=location.pathname+"?t="+Date.now(),1500)</script>')
+        return HTMLResponse(f'<div class="p-2 bg-yellow-900/50 text-yellow-300 rounded text-sm">🗑 {_html.escape(str(deleted))} test tokens removed</div><script>setTimeout(()=>location.href=location.pathname+"?t="+Date.now(),1500)</script>')
     except Exception as e:
-        return HTMLResponse(f'<div class="p-2 bg-red-900/50 text-red-300 rounded text-sm">Error: {e}</div>')
+        return HTMLResponse(f'<div class="p-2 bg-red-900/50 text-red-300 rounded text-sm">Error: {_html.escape(str(e))}</div>')
