@@ -69,7 +69,7 @@ async def login_post(
     )
 
 
-@router.get("/logout")
+@router.post("/logout")
 async def logout():
     """Clear session cookie and redirect to login."""
     response = RedirectResponse("/login", status_code=302)
