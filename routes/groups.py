@@ -32,7 +32,9 @@ async def group_detail_page(request: Request, group_id: str):
     except Exception:
         return HTMLResponse('<div class="p-6 text-red-400">Group not found</div>', status_code=404)
 
-    group = data["group"]
+    group = data.get("group") if isinstance(data, dict) else None
+    if not group or "id" not in group:
+        return HTMLResponse('<div class="p-6 text-red-400">Group not found or unexpected response from core</div>', status_code=404)
     real_group_id = group["id"]
 
     # Get members (driver accounts in this group)
@@ -46,8 +48,8 @@ async def group_detail_page(request: Request, group_id: str):
     try:
         all_data = await api("/driver-accounts?limit=200")
         all_accounts = all_data.get("accounts", [])
-        member_ids = {m["id"] for m in members}
-        available_accounts = [a for a in all_accounts if a["id"] not in member_ids and not a.get("group_id")]
+        member_ids = {m.get("id") for m in members}
+        available_accounts = [a for a in all_accounts if a.get("id") not in member_ids and not a.get("group_id")]
     except Exception:
         available_accounts = []
 

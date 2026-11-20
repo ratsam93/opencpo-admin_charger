@@ -84,9 +84,16 @@ async def token_detail_page(request: Request, token_id: str):
     except Exception:
         return HTMLResponse('<div class="p-6 text-red-400">Token not found</div>', status_code=404)
 
-    groups_data = await api("/groups")
+    token = data.get("token") if isinstance(data, dict) else None
+    if not token:
+        return HTMLResponse('<div class="p-6 text-red-400">Token not found or unexpected response from core</div>', status_code=404)
+
+    try:
+        groups_data = await api("/groups")
+    except Exception:
+        groups_data = {}
     return templates.TemplateResponse(request, "token_detail.html", context={
-        "token": data["token"],
+        "token": token,
         "sessions": data.get("sessions", []),
         "events": data.get("events", []),
         "groups": groups_data.get("groups", []),
