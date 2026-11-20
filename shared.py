@@ -38,7 +38,13 @@ templates.env.globals["compliance_url"] = COMPLIANCE_URL
 templates.env.globals["core_api_public_url"] = CORE_API_PUBLIC_URL
 
 # ── Local JWT verification (avoids calling core /me on every request) ─────
-_JWT_SECRET = os.getenv("JWT_SECRET", os.getenv("CORE_API_KEY", ""))
+_JWT_SECRET = os.getenv("JWT_SECRET") or os.getenv("CORE_API_KEY") or ""
+if not _JWT_SECRET:
+    raise RuntimeError(
+        "Refusing to start: neither JWT_SECRET nor CORE_API_KEY is set. "
+        "Set JWT_SECRET (must match the OCPP Core signing secret; compose sets it "
+        "to MANAGEMENT_API_KEY) or CORE_API_KEY."
+    )
 _JWT_ALGO = "HS256"
 
 
