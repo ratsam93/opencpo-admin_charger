@@ -47,6 +47,11 @@ logger = logging.getLogger(__name__)
 _PUBLIC_PREFIXES = ("/login", "/logout", "/setup", "/static", "/favicon.ico", "/health")
 
 
+def _is_public(path: str) -> bool:
+    """Exact match or path-segment boundary match (so /setupXYZ is NOT public)."""
+    return any(path == p or path.startswith(p + "/") for p in _PUBLIC_PREFIXES)
+
+
 class AuthMiddleware(BaseHTTPMiddleware):
     """Authenticate requests. Redirects unauthenticated users to setup wizard
     if the platform hasn't been configured yet, or to login otherwise."""
@@ -54,7 +59,7 @@ class AuthMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
         path = request.url.path
         # Allow public paths through unconditionally
-        if any(path == p or path.startswith(p) for p in _PUBLIC_PREFIXES):
+        if _is_public(path):
             return await call_next(request)
 
         user = await verify_session(request)
@@ -74,7 +79,7 @@ class SetupCheckMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
         path = request.url.path
         # Skip for static files, setup routes, login
-        if any(path == p or path.startswith(p) for p in _PUBLIC_PREFIXES):
+        if _is_public(path):
             return await call_next(request)
 
         # Check setup status — redirect ANYONE (authed or not) to /setup
