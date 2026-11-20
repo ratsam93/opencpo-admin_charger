@@ -11,8 +11,9 @@ import logging
 
 import uvicorn
 from fastapi import FastAPI, Request
-from fastapi.responses import RedirectResponse
+from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
+from urllib.parse import urlparse
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from shared import APP_TITLE, verify_session, get_setup_status
@@ -85,19 +86,82 @@ class SetupCheckMiddleware(BaseHTTPMiddleware):
         # Check setup status — redirect ANYONE (authed or not) to /setup
         # if the platform hasn't been configured yet.
         try:
-            status = await get_setup_status()
-            if not status.get("complete", False):
-                return RedirectResponse("/setup", status_code=302)
+            status = await get_setup_status(strict=True)
         except Exception:
-            # If core is unreachable, let the request through
-            pass
+            # Fail closed: if core is unreachable we cannot tell whether setup
+            # is complete, so do not serve the admin UI.
+            logger.warning("SetupCheckMiddleware: core unreachable for %s", path)
+            return HTMLResponse(
+                '<!doctype html><title>Service unavailable</title>'
+                '<body style="font-family:sans-serif;background:#0a1221;color:#c0cdd8;padding:2rem">'
+                '<h1>503 - Service unavailable</h1>'
+                '<p>The OpenCPO core API is not reachable. Please try again shortly.</p></body>',
+                status_code=503, headers={"Retry-After": "10"},
+            )
+        if not status.get("complete", False):
+            return RedirectResponse("/setup", status_code=302)
 
         return await call_next(request)
+
+
+_UNSAFE_METHODS = {"POST", "PUT", "PATCH", "DELETE"}
+
+
+class CSRFMiddleware(BaseHTTPMiddleware):
+    """Reject cross-origin state-changing requests.
+
+    If an Origin header is present (all browsers send it on cross-origin POSTs)
+    its host must match the request Host. Without Origin, fall back to Referer.
+    Requests with neither (non-browser clients) are allowed; they cannot ride
+    on a victim's cookies. Same-origin htmx requests carry a matching Origin.
+    """
+
+    async def dispatch(self, request: Request, call_next):
+        if request.method in _UNSAFE_METHODS:
+            source = request.headers.get("origin")
+            if source is None:
+                source = request.headers.get("referer")
+            if source is not None:
+                allowed = {request.headers.get("host", "")}
+                fwd = request.headers.get("x-forwarded-host")
+                if fwd:
+                    allowed.add(fwd.split(",")[0].strip())
+                host = urlparse(source).netloc
+                if not host or host not in allowed:
+                    logger.warning("CSRF: blocked %s %s from %r", request.method, request.url.path, source)
+                    return HTMLResponse("Cross-origin request blocked", status_code=403)
+        return await call_next(request)
+
+
+# Inline scripts/styles and the Tailwind play script are used throughout the
+# templates, so 'unsafe-inline' is required. Browser-side fetch/EventSource go
+# to the (configurable) core API URL, so connect-src is left open.
+_CSP = (
+    "default-src 'self'; "
+    "script-src 'self' 'unsafe-inline' 'unsafe-eval'; "
+    "style-src 'self' 'unsafe-inline'; "
+    "img-src 'self' data: https: http:; "
+    "font-src 'self' data:; "
+    "connect-src *; "
+    "object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
+)
+
+
+class SecurityHeadersMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        response = await call_next(request)
+        response.headers.setdefault("X-Content-Type-Options", "nosniff")
+        response.headers.setdefault("X-Frame-Options", "DENY")
+        response.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
+        response.headers.setdefault("Content-Security-Policy", _CSP)
+        return response
 
 
 app = FastAPI(title=APP_TITLE, docs_url=None, redoc_url=None)
 app.add_middleware(AuthMiddleware)
 app.add_middleware(SetupCheckMiddleware)
+app.add_middleware(CSRFMiddleware)
+app.add_middleware(SecurityHeadersMiddleware)
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
 # Register all route modules

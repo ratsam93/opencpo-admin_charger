@@ -64,15 +64,22 @@ def _verify_token_local(token: str) -> dict | None:
         return None
 
 
-async def get_setup_status() -> dict:
-    """Check if the platform has been configured (first-time setup)."""
+async def get_setup_status(strict: bool = False) -> dict:
+    """Check if the platform has been configured (first-time setup).
+
+    With strict=True, raise if core cannot be reached / answers non-200
+    instead of reporting "not complete".
+    """
     try:
         async with httpx.AsyncClient(base_url=CORE_API, timeout=5) as client:
             r = await client.get("/api/v1/admin/setup/status")
             if r.status_code == 200:
                 return r.json()
+            if strict:
+                raise RuntimeError(f"core setup status returned {r.status_code}")
     except Exception:
-        pass
+        if strict:
+            raise
     return {"complete": False, "steps": {}}
 
 
