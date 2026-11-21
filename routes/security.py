@@ -71,7 +71,7 @@ def _flag_card_html(flag: dict) -> str:
 </div>'''
 
 
-@router.post("/action/feature/toggle/{_html.escape(str(key), quote=True)}", response_class=HTMLResponse)
+@router.post("/action/feature/toggle/{key}", response_class=HTMLResponse)
 async def action_feature_toggle(key: str):
     """Toggle a feature flag via Core API — returns HTMX card partial."""
     try:

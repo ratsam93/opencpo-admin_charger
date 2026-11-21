@@ -120,7 +120,10 @@ async def group_invoice_download(request: Request, group_id: str, month: str = N
     headers = {"X-API-Key": CORE_API_KEY} if CORE_API_KEY else {}
     async with httpx.AsyncClient(base_url=CORE_API, timeout=30, headers=headers) as client:
         r = await client.get(f"/api/v1/groups/{group_id}/invoice?month={month}")
-        r.raise_for_status()
+    if r.status_code == 404:
+        return HTMLResponse("No invoice for this group and month.", status_code=404)
+    if not r.is_success:
+        return HTMLResponse("The invoice could not be generated right now.", status_code=502)
     return Response(
         content=r.content,
         media_type="application/pdf",

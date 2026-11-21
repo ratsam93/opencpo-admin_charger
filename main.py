@@ -72,6 +72,12 @@ class AuthMiddleware(BaseHTTPMiddleware):
         return await call_next(request)
 
 
+# Setup completion never reverts, so once core has said "complete" we stop asking.
+# (Before this, every page made an extra core call; when core rate-limited the
+# admin container's single IP the whole UI failed closed with 503.)
+_SETUP_COMPLETE = False
+
+
 class SetupCheckMiddleware(BaseHTTPMiddleware):
     """Check if platform setup is complete. Redirect to /setup if not.
     Runs BEFORE AuthMiddleware so that first-time visitors get the
@@ -81,6 +87,10 @@ class SetupCheckMiddleware(BaseHTTPMiddleware):
         path = request.url.path
         # Skip for static files, setup routes, login
         if _is_public(path):
+            return await call_next(request)
+
+        global _SETUP_COMPLETE
+        if _SETUP_COMPLETE:
             return await call_next(request)
 
         # Check setup status — redirect ANYONE (authed or not) to /setup
@@ -101,6 +111,7 @@ class SetupCheckMiddleware(BaseHTTPMiddleware):
         if not status.get("complete", False):
             return RedirectResponse("/setup", status_code=302)
 
+        _SETUP_COMPLETE = True
         return await call_next(request)
 
 

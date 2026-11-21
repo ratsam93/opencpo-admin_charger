@@ -25,6 +25,7 @@ def client(monkeypatch):
     async def ok_status(strict=False):
         return {"complete": True}
     monkeypatch.setattr(main, "get_setup_status", ok_status)
+    monkeypatch.setattr(main, "_SETUP_COMPLETE", False)
     auth._failures.clear()
     return TestClient(main.app, follow_redirects=False)
 
@@ -56,6 +57,7 @@ def test_setup_check_fails_closed(monkeypatch):
     async def boom(strict=False):
         raise RuntimeError("down")
     monkeypatch.setattr(main, "get_setup_status", boom)
+    monkeypatch.setattr(main, "_SETUP_COMPLETE", False)
     c = TestClient(main.app, follow_redirects=False)
     assert c.get("/chargers").status_code == 503
     assert c.get("/login").status_code == 200
@@ -110,3 +112,55 @@ def test_error_text_is_escaped(client, monkeypatch):
     r = client.post("/action/charger/delete/CP1", headers={"Origin": "http://testserver"})
     assert payload not in r.text
     assert "&lt;script&gt;" in r.text
+
+
+def test_no_route_path_contains_helper_code():
+    """Regression: an escaping pass once put html.escape(...) inside a route
+    decorator path, so /action/feature/toggle/{key} could never match."""
+    bad = [p for p in main.app.openapi()["paths"] if "escape(" in p or "_html" in p]
+    assert bad == []
+    paths = set(main.app.openapi()["paths"])
+    assert "/action/feature/toggle/{key}" in paths
+
+
+def test_setup_status_is_remembered_once_complete(monkeypatch):
+    calls = {"n": 0}
+
+    async def ok_status(strict=False):
+        calls["n"] += 1
+        return {"complete": True}
+
+    monkeypatch.setattr(main, "get_setup_status", ok_status)
+    monkeypatch.setattr(main, "_SETUP_COMPLETE", False)
+    c = TestClient(main.app, follow_redirects=False)
+    for _ in range(3):
+        c.get("/chargers")
+    assert calls["n"] == 1
+
+
+def test_missing_invoice_and_certificate_are_404_not_500(client, monkeypatch):
+    import httpx
+    import routes.groups as groups
+    import routes.pki as pki
+
+    class _Resp:
+        status_code = 404
+        is_success = False
+        content = b""
+        headers = {}
+
+    class _Client:
+        def __init__(self, *a, **k):
+            self.headers = k.get("headers", {})
+            seen.append(self.headers)
+        async def __aenter__(self): return self
+        async def __aexit__(self, *a): return False
+        async def get(self, *a, **k): return _Resp()
+
+    seen = []
+    monkeypatch.setattr(httpx, "AsyncClient", _Client)
+    monkeypatch.setattr(pki, "CORE_API_KEY", "k-test")
+    client.cookies.set("opencpo_session", _token())
+    assert client.get("/groups/G1/invoice").status_code == 404
+    assert client.get("/pki/certificates/ABC/download").status_code == 404
+    assert any(h.get("X-API-Key") == "k-test" for h in seen), "PKI download must send the API key"

@@ -9,7 +9,7 @@ import httpx
 from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse, Response
 
-from shared import api, templates, CORE_API
+from shared import api, templates, CORE_API, CORE_API_KEY
 
 router = APIRouter()
 
@@ -332,9 +332,13 @@ async def pki_audit_log_partial(request: Request, type: str = "", date_from: str
 @router.get("/pki/certificates/{serial}/download")
 async def download_cert(serial: str):
     """Proxy: download certificate PEM."""
-    async with httpx.AsyncClient(base_url=CORE_API, timeout=10) as client:
+    headers = {"X-API-Key": CORE_API_KEY} if CORE_API_KEY else {}
+    async with httpx.AsyncClient(base_url=CORE_API, timeout=10, headers=headers) as client:
         r = await client.get(f"/api/v1/pki/certificates/{serial}/download")
-        r.raise_for_status()
+    if r.status_code == 404:
+        return HTMLResponse("Certificate not found.", status_code=404)
+    if not r.is_success:
+        return HTMLResponse("The certificate could not be downloaded right now.", status_code=502)
     return Response(
         content=r.content,
         media_type="application/x-pem-file",
