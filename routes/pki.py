@@ -1,5 +1,8 @@
 """PKI certificate management — dashboard, cert table, issue, revoke."""
+import html as _html
+import json
 import re
+from urllib.parse import quote
 from datetime import datetime, timezone
 
 import httpx
@@ -9,6 +12,16 @@ from fastapi.responses import HTMLResponse, Response
 from shared import api, templates, CORE_API
 
 router = APIRouter()
+
+
+def _e(value, quote_attr: bool = False) -> str:
+    """HTML-escape any value for interpolation into markup."""
+    return _html.escape(str(value), quote=quote_attr)
+
+
+def _jsattr(value) -> str:
+    """JS string literal safe inside a double-quoted HTML attribute or <script>."""
+    return _html.escape(json.dumps(str(value)))
 
 
 def _parse_subject(subject: str) -> dict:
@@ -94,18 +107,18 @@ async def pki_cert_rows(
 
         if type_val == "user" and cn:
             name_part = cn.split("@")[0].replace(".", " ").title()
-            identity = f'''<div class="text-gray-200 font-medium">{name_part}</div>
-                <div class="text-gray-500 text-[11px]">{cn}</div>'''
+            identity = f'''<div class="text-gray-200 font-medium">{_e(name_part)}</div>
+                <div class="text-gray-500 text-[11px]">{_e(cn)}</div>'''
             if ou:
-                identity += f'<div class="text-gray-600 text-[10px]">{ou}</div>'
+                identity += f'<div class="text-gray-600 text-[10px]">{_e(ou)}</div>'
         elif type_val == "secc" and cp:
-            identity = f'''<div class="text-gray-200 font-medium">{cp}</div>
+            identity = f'''<div class="text-gray-200 font-medium">{_e(cp)}</div>
                 <div class="text-gray-500 text-[11px]">Charger certificate</div>'''
         elif type_val == "contract" and cn:
-            identity = f'''<div class="text-gray-200 font-medium">{cn}</div>
+            identity = f'''<div class="text-gray-200 font-medium">{_e(cn)}</div>
                 <div class="text-gray-500 text-[11px]">Contract / EMAID</div>'''
         else:
-            identity = f'<div class="text-gray-400">{cn or "—"}</div>'
+            identity = f'<div class="text-gray-400">{_e(cn or "—")}</div>'
 
         expires_raw = c.get("not_after") or ""
         expires_date = expires_raw[:10]
@@ -129,26 +142,26 @@ async def pki_cert_rows(
         issued = (c.get("issued_at") or "")[:10]
 
         can_revoke = status_val == "active"
-        revoke_btn = f'''<button onclick="event.stopPropagation();openRevokeModal('{c["serial"]}', '{subject_short.replace("'","&apos;")}')"
+        revoke_btn = f'''<button onclick="event.stopPropagation();openRevokeModal({_jsattr(c["serial"])}, {_jsattr(subject_short)})"
             class="px-2 py-1 bg-red-900/50 hover:bg-red-800 text-red-300 rounded text-xs transition-colors">Revoke</button>''' if can_revoke else ""
 
         rows += f'''<tr class="border-b border-gray-800/50 hover:bg-gray-800/30 cursor-pointer text-sm"
-            hx-get="/partials/pki/cert-detail/{c["serial"]}"
+            hx-get="/partials/pki/cert-detail/{_e(c["serial"], True)}"
             hx-target="#cert-detail-panel"
             hx-swap="innerHTML"
             onclick="document.getElementById('cert-detail-panel').classList.remove('hidden')">
             <td class="p-3">{status_dot}</td>
             <td class="p-3 text-base">{type_icon}</td>
             <td class="p-3">{identity}</td>
-            <td class="p-3 text-xs text-gray-500">{issued}</td>
+            <td class="p-3 text-xs text-gray-500">{_e(issued)}</td>
             <td class="p-3 text-xs">
-                <div class="text-gray-400">{expires_date}</div>
+                <div class="text-gray-400">{_e(expires_date)}</div>
                 {days_left}
             </td>
-            <td class="p-3 font-mono text-[11px] text-gray-600" title="{c["serial"]}">{serial_short}</td>
+            <td class="p-3 font-mono text-[11px] text-gray-600" title="{_e(c["serial"], True)}">{_e(serial_short)}</td>
             <td class="p-3">
                 <div class="flex gap-1">
-                    <a href="/pki/certificates/{c["serial"]}/download" onclick="event.stopPropagation()"
+                    <a href="/pki/certificates/{_e(c["serial"], True)}/download" onclick="event.stopPropagation()"
                        class="px-2 py-1 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded text-xs transition-colors">PEM</a>
                     {revoke_btn}
                 </div>
@@ -164,7 +177,7 @@ async def pki_cert_rows(
         next_disabled = "opacity-40 cursor-not-allowed" if page >= pages else ""
         prev_page = max(1, page - 1)
         next_page = min(pages, page + 1)
-        qs = f"&status={status}&type={type}&charge_point={charge_point}&search={search}"
+        qs = _e(f"&status={quote(status)}&type={quote(type)}&charge_point={quote(charge_point)}&search={quote(search)}", True)
         pagination = f'''
         <tr class="border-t border-gray-800">
             <td colspan="7" class="p-3">
@@ -198,7 +211,7 @@ async def pki_cert_detail(request: Request, serial: str):
         "active":  '<span class="px-2 py-1 bg-green-900 text-green-300 rounded-full text-xs">✓ Active</span>',
         "revoked": '<span class="px-2 py-1 bg-red-900 text-red-300 rounded-full text-xs">✗ Revoked</span>',
         "expired": '<span class="px-2 py-1 bg-gray-700 text-gray-400 rounded-full text-xs">Expired</span>',
-    }.get(status_val, f'<span class="px-2 py-1 bg-gray-800 text-xs">{status_val}</span>')
+    }.get(status_val, f'<span class="px-2 py-1 bg-gray-800 text-xs">{_e(status_val)}</span>')
 
     serial_full = cert.get("serial", "")
     fp = cert.get("fingerprint") or "—"
@@ -207,7 +220,7 @@ async def pki_cert_detail(request: Request, serial: str):
 
     revoke_btn = ""
     if status_val == "active":
-        revoke_btn = f'''<button onclick="openRevokeModal('{serial_full}', '{cert.get("subject","").replace("'","&apos;")}')"
+        revoke_btn = f'''<button onclick="openRevokeModal({_jsattr(serial_full)}, {_jsattr(cert.get("subject",""))})"
             class="px-3 py-2 bg-red-900/50 hover:bg-red-800 text-red-300 rounded text-sm transition-colors">
             🚫 Revoke Certificate</button>'''
 
@@ -216,8 +229,8 @@ async def pki_cert_detail(request: Request, serial: str):
         revocation_info = f'''
         <div class="mt-3 p-3 bg-red-900/20 border border-red-800 rounded-lg text-sm">
             <div class="text-red-400 font-medium mb-1">Revocation Details</div>
-            <div class="text-gray-300">Revoked: {(cert.get("revoked_at") or "")[:19].replace("T"," ")}</div>
-            <div class="text-gray-300">Reason: {cert.get("revocation_reason") or "unspecified"}</div>
+            <div class="text-gray-300">Revoked: {_e((cert.get("revoked_at") or "")[:19].replace("T"," "))}</div>
+            <div class="text-gray-300">Reason: {_e(cert.get("revocation_reason") or "unspecified")}</div>
         </div>'''
 
     return HTMLResponse(f'''
@@ -229,36 +242,36 @@ async def pki_cert_detail(request: Request, serial: str):
         </div>
         <div class="space-y-2 text-sm">
             <div class="flex justify-between"><span class="text-gray-500">Status</span>{status_badge}</div>
-            <div class="flex justify-between"><span class="text-gray-500">Type</span><span class="text-gray-300">{cert.get("type","—").upper()}</span></div>
+            <div class="flex justify-between"><span class="text-gray-500">Type</span><span class="text-gray-300">{_e(str(cert.get("type","—")).upper())}</span></div>
             <div class="mt-1 pt-2 border-t border-gray-800">
                 <div class="text-gray-500 text-xs mb-1">Serial</div>
-                <div class="font-mono text-xs text-gray-400 break-all">{serial_full}</div>
+                <div class="font-mono text-xs text-gray-400 break-all">{_e(serial_full)}</div>
             </div>
             <div class="pt-1">
                 <div class="text-gray-500 text-xs mb-1">Subject</div>
-                <div class="text-xs text-gray-300 break-all">{cert.get("subject","—")}</div>
+                <div class="text-xs text-gray-300 break-all">{_e(cert.get("subject","—"))}</div>
             </div>
             <div class="pt-1">
                 <div class="text-gray-500 text-xs mb-1">Issuer</div>
-                <div class="text-xs text-gray-400 break-all">{cert.get("issuer","—")}</div>
+                <div class="text-xs text-gray-400 break-all">{_e(cert.get("issuer","—"))}</div>
             </div>
             <div class="pt-1">
                 <div class="text-gray-500 text-xs mb-1">Fingerprint (SHA-256)</div>
-                <div class="font-mono text-xs text-gray-500 break-all">{fp}</div>
+                <div class="font-mono text-xs text-gray-500 break-all">{_e(fp)}</div>
             </div>
             <div class="flex justify-between pt-1 border-t border-gray-800">
                 <span class="text-gray-500">Valid From</span>
-                <span class="text-gray-300 text-xs">{(cert.get("not_before") or "")[:10]}</span>
+                <span class="text-gray-300 text-xs">{_e((cert.get("not_before") or "")[:10])}</span>
             </div>
             <div class="flex justify-between">
                 <span class="text-gray-500">Valid Until</span>
-                <span class="text-gray-300 text-xs">{(cert.get("not_after") or "")[:10]}</span>
+                <span class="text-gray-300 text-xs">{_e((cert.get("not_after") or "")[:10])}</span>
             </div>
-            {f'<div class="flex justify-between"><span class="text-gray-500">Charge Point</span><span class="font-mono text-xs text-gray-300">{cert.get("charge_point")}</span></div>' if cert.get("charge_point") else ""}
+            {f'<div class="flex justify-between"><span class="text-gray-500">Charge Point</span><span class="font-mono text-xs text-gray-300">{_e(cert.get("charge_point"))}</span></div>' if cert.get("charge_point") else ""}
         </div>
         {revocation_info}
         <div class="flex gap-2 mt-4 pt-3 border-t border-gray-800">
-            <a href="/pki/certificates/{serial_full}/download"
+            <a href="/pki/certificates/{_e(serial_full, True)}/download"
                class="flex-1 text-center px-3 py-2 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded text-sm transition-colors">
                ⬇ Download PEM</a>
             {revoke_btn}
@@ -304,13 +317,13 @@ async def pki_audit_log_partial(request: Request, type: str = "", date_from: str
             <div class="text-lg mt-0.5">{icon}</div>
             <div class="flex-1 min-w-0">
                 <div class="flex items-center gap-2 mb-0.5">
-                    <span class="{color} font-medium text-sm">{event_type}</span>
-                    <span class="px-1.5 py-0.5 bg-gray-800 text-gray-400 rounded text-xs">{cert_type}</span>
-                    {f'<span class="text-xs text-gray-500 font-mono">{e.get("charge_point","")}</span>' if e.get("charge_point") else ""}
+                    <span class="{color} font-medium text-sm">{_e(event_type)}</span>
+                    <span class="px-1.5 py-0.5 bg-gray-800 text-gray-400 rounded text-xs">{_e(cert_type)}</span>
+                    {f'<span class="text-xs text-gray-500 font-mono">{_e(e.get("charge_point",""))}</span>' if e.get("charge_point") else ""}
                 </div>
-                <div class="text-xs text-gray-400 truncate">{subject_short}</div>
+                <div class="text-xs text-gray-400 truncate">{_e(subject_short)}</div>
             </div>
-            <div class="text-xs text-gray-600 whitespace-nowrap">{ts}</div>
+            <div class="text-xs text-gray-600 whitespace-nowrap">{_e(ts)}</div>
         </div>'''
 
     return HTMLResponse(f'<div class="divide-y divide-gray-800/50">{items}</div>')
@@ -353,8 +366,8 @@ async def action_issue_secc(request: Request):
         return HTMLResponse(f'''
             <div class="p-3 bg-green-900/50 border border-green-800 rounded text-green-300 text-sm"
                  hx-swap-oob="true" id="issue-result">
-                ✓ SECC cert issued for <span class="font-mono">{charge_point_id}</span>
-                — serial: <span class="font-mono">{serial}…</span>
+                ✓ SECC cert issued for <span class="font-mono">{_e(charge_point_id)}</span>
+                — serial: <span class="font-mono">{_e(serial)}…</span>
             </div>
             <script>
                 htmx.trigger('#cert-tbody', 'refresh');
@@ -363,7 +376,7 @@ async def action_issue_secc(request: Request):
             </script>
         ''')
     except Exception as e:
-        return HTMLResponse(f'<div class="p-3 bg-red-900/50 border border-red-800 rounded text-red-300 text-sm">Error: {e}</div>')
+        return HTMLResponse(f'<div class="p-3 bg-red-900/50 border border-red-800 rounded text-red-300 text-sm">Error: {_e(e)}</div>')
 
 
 @router.post("/action/pki/issue-contract", response_class=HTMLResponse)
@@ -380,13 +393,13 @@ async def action_issue_contract(request: Request):
         serial = result.get("serial", "")[:16]
         return HTMLResponse(f'''
             <div class="p-3 bg-green-900/50 border border-green-800 rounded text-green-300 text-sm">
-                ✓ Contract cert issued for <span class="font-mono">{emaid}</span>
-                — serial: <span class="font-mono">{serial}…</span>
+                ✓ Contract cert issued for <span class="font-mono">{_e(emaid)}</span>
+                — serial: <span class="font-mono">{_e(serial)}…</span>
             </div>
             <script>showToast('Contract certificate issued', 'success');</script>
         ''')
     except Exception as e:
-        return HTMLResponse(f'<div class="p-3 bg-red-900/50 border border-red-800 rounded text-red-300 text-sm">Error: {e}</div>')
+        return HTMLResponse(f'<div class="p-3 bg-red-900/50 border border-red-800 rounded text-red-300 text-sm">Error: {_e(e)}</div>')
 
 
 @router.post("/action/pki/issue-user", response_class=HTMLResponse)
@@ -406,20 +419,20 @@ async def action_issue_user(request: Request):
         password = result.get("p12_password", "")
         return HTMLResponse(f'''
             <div class="p-4 bg-green-900/50 border border-green-800 rounded text-sm space-y-2">
-                <div class="text-green-300 font-medium">✓ User certificate issued for {email}</div>
-                <div class="text-gray-300">Serial: <span class="font-mono">{serial}…</span></div>
+                <div class="text-green-300 font-medium">✓ User certificate issued for {_e(email)}</div>
+                <div class="text-gray-300">Serial: <span class="font-mono">{_e(serial)}…</span></div>
                 <div class="p-2 bg-yellow-900/30 border border-yellow-800 rounded text-yellow-300">
                     ⚠️ PKCS#12 password (save this now — shown once):<br>
-                    <span class="font-mono font-bold">{password}</span>
+                    <span class="font-mono font-bold">{_e(password)}</span>
                 </div>
-                <a href="/pki/certificates/{result.get("serial","")}/download"
+                <a href="/pki/certificates/{_e(result.get("serial",""), True)}/download"
                    class="inline-block px-3 py-1 bg-gray-800 text-gray-300 rounded text-xs hover:bg-gray-700">
                    ⬇ Download .p12</a>
             </div>
             <script>showToast('User certificate issued', 'success');</script>
         ''')
     except Exception as e:
-        return HTMLResponse(f'<div class="p-3 bg-red-900/50 border border-red-800 rounded text-red-300 text-sm">Error: {e}</div>')
+        return HTMLResponse(f'<div class="p-3 bg-red-900/50 border border-red-800 rounded text-red-300 text-sm">Error: {_e(e)}</div>')
 
 
 @router.post("/action/pki/revoke-account", response_class=HTMLResponse)
@@ -437,16 +450,16 @@ async def action_revoke_account(request: Request):
         count = result.get("count", 0)
         return HTMLResponse(f'''
             <div class="p-3 bg-yellow-900/50 border border-yellow-800 rounded text-yellow-300 text-sm">
-                ✓ Revoked {count} certificate(s) for {email}
+                ✓ Revoked {_e(count)} certificate(s) for {_e(email)}
             </div>
             <script>
-                showToast('Revoked {count} certs for {email}', 'warning');
+                showToast({_jsattr(f'Revoked {count} certs for {email}')}, 'warning');
                 const tbody = document.getElementById('cert-tbody');
                 if (tbody) htmx.trigger(tbody, 'refresh');
             </script>
         ''')
     except Exception as e:
-        return HTMLResponse(f'<div class="p-3 bg-red-900/50 border border-red-800 rounded text-red-300 text-sm">Error: {e}</div>')
+        return HTMLResponse(f'<div class="p-3 bg-red-900/50 border border-red-800 rounded text-red-300 text-sm">Error: {_e(e)}</div>')
 
 
 @router.post("/action/pki/revoke", response_class=HTMLResponse)
@@ -463,14 +476,14 @@ async def action_revoke_cert(request: Request):
         await api("/pki/revoke", method="POST", json={"serial": serial, "reason": reason})
         return HTMLResponse(f'''
             <div class="p-3 bg-yellow-900/50 border border-yellow-800 rounded text-yellow-300 text-sm">
-                ✓ Certificate revoked (reason: {reason})
+                ✓ Certificate revoked (reason: {_e(reason)})
             </div>
             <script>
                 closeRevokeModal();
-                showToast('Certificate revoked: {reason}', 'warning');
+                showToast({_jsattr(f'Certificate revoked: {reason}')}, 'warning');
                 const tbody = document.getElementById('cert-tbody');
                 if (tbody) htmx.trigger(tbody, 'refresh');
             </script>
         ''')
     except Exception as e:
-        return HTMLResponse(f'<div class="p-3 bg-red-900/50 border border-red-800 rounded text-red-300 text-sm">Error: {e}</div>')
+        return HTMLResponse(f'<div class="p-3 bg-red-900/50 border border-red-800 rounded text-red-300 text-sm">Error: {_e(e)}</div>')

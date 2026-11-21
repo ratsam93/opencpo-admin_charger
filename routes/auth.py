@@ -5,6 +5,8 @@ Handles login/logout via OCPP Core's JWT-based admin auth endpoint.
 Session is stored in a signed cookie (JWT).
 """
 import logging
+import os
+import time
 
 import httpx
 from fastapi import APIRouter, Request, Form
@@ -15,6 +17,42 @@ from shared import templates, CORE_API, verify_session
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+
+# ── Login rate limiting (in-memory, per client IP) ───────────────────────────
+_MAX_FAILURES = 10
+_WINDOW_SECONDS = 300
+_failures: dict[str, list[float]] = {}
+
+
+def _client_ip(request: Request) -> str:
+    return request.client.host if request.client else "unknown"
+
+
+def _recent_failures(ip: str) -> list[float]:
+    cutoff = time.monotonic() - _WINDOW_SECONDS
+    recent = [t for t in _failures.get(ip, []) if t > cutoff]
+    if recent:
+        _failures[ip] = recent
+    else:
+        _failures.pop(ip, None)
+    return recent
+
+
+def _is_rate_limited(ip: str) -> bool:
+    return len(_recent_failures(ip)) >= _MAX_FAILURES
+
+
+def _record_failure(ip: str) -> None:
+    _recent_failures(ip)
+    _failures.setdefault(ip, []).append(time.monotonic())
+
+
+# ── Session cookie ───────────────────────────────────────────────────────────
+def _cookie_secure() -> bool:
+    env = os.getenv("COOKIE_SECURE")
+    if env is not None and env.strip() != "":
+        return env.strip().lower() in ("1", "true", "yes", "on")
+    return os.getenv("PUBLIC_URL", "").lower().startswith("https")
 
 
 @router.get("/login", response_class=HTMLResponse)
@@ -33,6 +71,14 @@ async def login_post(
     password: str = Form(...),
 ):
     """Validate credentials against OCPP Core and issue a JWT session cookie."""
+    ip = _client_ip(request)
+    if _is_rate_limited(ip):
+        logger.warning("Login rate limit hit for %s", ip)
+        return templates.TemplateResponse(
+            request, "login.html",
+            context={"error": "Too many failed login attempts. Please try again in a few minutes."},
+            status_code=429, headers={"Retry-After": str(_WINDOW_SECONDS)},
+        )
     error = None
     try:
         async with httpx.AsyncClient(base_url=CORE_API, timeout=10) as client:
@@ -53,9 +99,11 @@ async def login_post(
                 path="/",               # available on every page
                 httponly=True,
                 samesite="lax",
+                secure=_cookie_secure(),
             )
             return response
 
+        _record_failure(ip)
         error = data.get("detail", "Invalid email or password.")
 
     except httpx.RequestError:
@@ -69,7 +117,7 @@ async def login_post(
     )
 
 
-@router.get("/logout")
+@router.post("/logout")
 async def logout():
     """Clear session cookie and redirect to login."""
     response = RedirectResponse("/login", status_code=302)

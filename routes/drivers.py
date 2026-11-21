@@ -1,4 +1,5 @@
 """Driver account management."""
+import html as _html
 import logging
 from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse
@@ -61,7 +62,7 @@ async def action_issue_cert(request: Request):
         return HTMLResponse(
             f'<div class="flex flex-col gap-1">'
             f'<span class="text-green-400 text-xs">✅ Token created</span>'
-            f'<input type="text" value="{setup_url}" readonly '
+            f'<input type="text" value="{_html.escape(str(setup_url), quote=True)}" readonly '
             f'class="bg-gray-800 border border-gray-700 text-gray-300 text-xs rounded px-2 py-1 w-64 font-mono" '
             f'onclick="this.select();navigator.clipboard.writeText(this.value)" />'
             f'<span class="text-gray-500 text-[10px]">Click to copy • Expires in 72h</span>'
@@ -69,7 +70,7 @@ async def action_issue_cert(request: Request):
         )
     except Exception as e:
         detail = getattr(e, "detail", str(e))
-        return HTMLResponse(f'<span class="text-red-400 text-xs">❌ {detail}</span>')
+        return HTMLResponse(f'<span class="text-red-400 text-xs">❌ {_html.escape(str(detail))}</span>')
 
 
 @router.post("/action/driver/cert/revoke", response_class=HTMLResponse)
@@ -85,4 +86,4 @@ async def action_revoke_certs(request: Request):
         return HTMLResponse('<span class="text-yellow-400 text-xs">🚫 All certs revoked</span>')
     except Exception as e:
         detail = getattr(e, "detail", str(e))
-        return HTMLResponse(f'<span class="text-red-400 text-xs">❌ {detail}</span>')
+        return HTMLResponse(f'<span class="text-red-400 text-xs">❌ {_html.escape(str(detail))}</span>')

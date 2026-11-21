@@ -1,4 +1,5 @@
 """Update panel routes — check version, trigger update, postpone, and history."""
+import html as _html
 import logging
 
 from fastapi import APIRouter, Request
@@ -114,9 +115,9 @@ async def update_history_partial(request: Request):
 
         rows += f"""
             <tr class="hover:bg-gray-800/30 transition-colors">
-                <td class="py-2 pr-3 text-xs text-gray-500 font-mono whitespace-nowrap">{ts}</td>
-                <td class="py-2 pr-3 text-xs">{icon} <span class="text-gray-300">{ev_type.capitalize()}</span></td>
-                <td class="py-2 pr-3 text-xs text-gray-400">{desc}</td>
+                <td class="py-2 pr-3 text-xs text-gray-500 font-mono whitespace-nowrap">{_html.escape(str(ts))}</td>
+                <td class="py-2 pr-3 text-xs">{icon} <span class="text-gray-300">{_html.escape(str(ev_type.capitalize()))}</span></td>
+                <td class="py-2 pr-3 text-xs text-gray-400">{_html.escape(str(desc))}</td>
                 <td class="py-2 text-xs text-right">{badge}</td>
             </tr>"""
 
@@ -148,10 +149,10 @@ async def action_update_check(request: Request):
         current = status.get("current", "unknown")
         needs = status.get("needs_update", False)
         if needs:
-            return HTMLResponse(f'<div class="text-yellow-300 text-sm mt-1">Update available: {current} → <b>{latest}</b></div>')
-        return HTMLResponse(f'<div class="text-green-400 text-sm mt-1">Already at latest ({latest})</div>')
+            return HTMLResponse(f'<div class="text-yellow-300 text-sm mt-1">Update available: {_html.escape(str(current))} → <b>{_html.escape(str(latest))}</b></div>')
+        return HTMLResponse(f'<div class="text-green-400 text-sm mt-1">Already at latest ({_html.escape(str(latest))})</div>')
     except Exception as e:
-        return HTMLResponse(f'<div class="text-red-400 text-sm mt-1">Check failed: {e}</div>')
+        return HTMLResponse(f'<div class="text-red-400 text-sm mt-1">Check failed: {_html.escape(str(e))}</div>')
 
 
 @router.post("/action/update/run", response_class=HTMLResponse)
@@ -168,9 +169,9 @@ async def action_update_run(request: Request):
             return HTMLResponse('<div class="text-green-400 text-sm whitespace-pre-wrap font-mono mt-1">✅ Update complete. Reloading... <script>setTimeout(() => location.reload(), 3000)</script></div>')
         else:
             err = data.get("error", data.get("log", "Unknown error"))[:500]
-            return HTMLResponse(f'<div class="text-red-400 text-sm mt-1">Update failed: {err}</div>')
+            return HTMLResponse(f'<div class="text-red-400 text-sm mt-1">Update failed: {_html.escape(str(err))}</div>')
     except Exception as e:
-        return HTMLResponse(f'<div class="text-red-400 text-sm mt-1">Update failed: {e}</div>')
+        return HTMLResponse(f'<div class="text-red-400 text-sm mt-1">Update failed: {_html.escape(str(e))}</div>')
 
 
 @router.post("/action/update/postpone", response_class=HTMLResponse)

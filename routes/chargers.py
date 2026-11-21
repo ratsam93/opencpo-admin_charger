@@ -1,4 +1,5 @@
 """Charger management, remote control, and OCPP commands."""
+import html as _html
 from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse
 
@@ -61,15 +62,15 @@ async def remote_sessions_partial(request: Request, cp_id: str, limit: int = 10)
         status_badge = {
             "active": '<span class="px-2 py-0.5 bg-green-900 text-green-300 rounded text-xs">Active</span>',
             "completed": '<span class="px-2 py-0.5 bg-blue-900 text-blue-300 rounded text-xs">Done</span>',
-        }.get(s.get("status", ""), f'<span class="px-2 py-0.5 bg-gray-800 text-gray-400 rounded text-xs">{s.get("status","")}</span>')
+        }.get(s.get("status", ""), f'<span class="px-2 py-0.5 bg-gray-800 text-gray-400 rounded text-xs">{_html.escape(str(s.get("status","")))}</span>')
 
         rows += f'''<tr class="border-b border-gray-800 text-sm hover:bg-gray-800/50">
-            <td class="p-3 text-xs text-gray-400">{s.get("start_time","—")}</td>
-            <td class="p-3 text-xs text-gray-400">{s.get("stop_time","—")}</td>
+            <td class="p-3 text-xs text-gray-400">{_html.escape(str(s.get("start_time","—")))}</td>
+            <td class="p-3 text-xs text-gray-400">{_html.escape(str(s.get("stop_time","—")))}</td>
             <td class="p-3">{status_badge}</td>
             <td class="p-3 text-right font-mono">{s.get("energy_kwh",0):.2f}</td>
-            <td class="p-3 text-xs text-gray-400">{s.get("auth_id","—")}</td>
-            <td class="p-3 text-xs text-gray-400">{s.get("stop_reason","—")}</td>
+            <td class="p-3 text-xs text-gray-400">{_html.escape(str(s.get("auth_id","—")))}</td>
+            <td class="p-3 text-xs text-gray-400">{_html.escape(str(s.get("stop_reason","—")))}</td>
         </tr>'''
 
     if not rows:
@@ -112,15 +113,15 @@ async def remote_connectors_partial(request: Request, cp_id: str):
             <div class="flex items-center justify-between mb-3">
                 <div class="flex items-center gap-2">
                     <span class="w-2 h-2 rounded-full {dot_class}"></span>
-                    <span class="font-bold">Connector {conn.get("connector_id")}</span>
-                    <span class="text-xs text-gray-400">{status}</span>
+                    <span class="font-bold">Connector {_html.escape(str(conn.get("connector_id")))}</span>
+                    <span class="text-xs text-gray-400">{_html.escape(str(status))}</span>
                 </div>
             </div>
             <div class="grid grid-cols-2 gap-2">
-                <button hx-post="/action/start/{cp_id}?connector={conn.get("connector_id")}" hx-swap="outerHTML"
+                <button hx-post="/action/start/{_html.escape(str(cp_id), quote=True)}?connector={_html.escape(str(conn.get("connector_id")), quote=True)}" hx-swap="outerHTML"
                     class="py-3 rounded-lg font-bold text-sm {"bg-gradient-to-br from-green-600 to-green-500 text-white shadow-lg shadow-green-500/30" if can_start else "bg-gray-800 text-gray-500 cursor-not-allowed"}"
                     {"" if can_start else "disabled"}>▶ Start</button>
-                <button hx-post="/action/stop/{cp_id}?connector={conn.get("connector_id")}" hx-swap="outerHTML"
+                <button hx-post="/action/stop/{_html.escape(str(cp_id), quote=True)}?connector={_html.escape(str(conn.get("connector_id")), quote=True)}" hx-swap="outerHTML"
                     class="py-3 rounded-lg font-bold text-sm {"bg-gradient-to-br from-red-600 to-red-500 text-white shadow-lg shadow-red-500/30" if can_stop else "bg-gray-800 text-gray-500 cursor-not-allowed"}"
                     {"" if can_stop else "disabled"}>■ Stop</button>
             </div>
@@ -139,9 +140,9 @@ async def remote_pki_partial(request: Request, cp_id: str):
 
     return HTMLResponse(f'''
         <div class="grid grid-cols-3 gap-4 text-center">
-            <div><div class="text-2xl font-bold text-green-400">{stats.get("active", 0)}</div><div class="text-xs text-gray-500">Active</div></div>
-            <div><div class="text-2xl font-bold text-red-400">{stats.get("revoked", 0)}</div><div class="text-xs text-gray-500">Revoked</div></div>
-            <div><div class="text-2xl font-bold text-yellow-400">{stats.get("expiring_30d", 0)}</div><div class="text-xs text-gray-500">Expiring</div></div>
+            <div><div class="text-2xl font-bold text-green-400">{_html.escape(str(stats.get("active", 0)))}</div><div class="text-xs text-gray-500">Active</div></div>
+            <div><div class="text-2xl font-bold text-red-400">{_html.escape(str(stats.get("revoked", 0)))}</div><div class="text-xs text-gray-500">Revoked</div></div>
+            <div><div class="text-2xl font-bold text-yellow-400">{_html.escape(str(stats.get("expiring_30d", 0)))}</div><div class="text-xs text-gray-500">Expiring</div></div>
         </div>
     ''')
 
@@ -172,7 +173,7 @@ async def action_charger_assign_tariff(request: Request, cp_id: str):
     except Exception as e:
         return HTMLResponse(f'''
             <td class="p-3">
-                <span class="text-red-400 text-xs">Error: {e}</span>
+                <span class="text-red-400 text-xs">Error: {_html.escape(str(e))}</span>
             </td>
         ''')
 
@@ -201,7 +202,7 @@ async def action_charger_create(request: Request):
             <script>setTimeout(() => { closeModal('modal-charger-create'); location.href=location.pathname+"?t="+Date.now(); }, 1200);</script>
         ''')
     except Exception as e:
-        return HTMLResponse(f'<div class="p-3 bg-red-900/50 border border-red-800 rounded text-red-300 text-sm">Error: {e}</div>')
+        return HTMLResponse(f'<div class="p-3 bg-red-900/50 border border-red-800 rounded text-red-300 text-sm">Error: {_html.escape(str(e))}</div>')
 
 
 @router.post("/action/charger/update/{cp_id}", response_class=HTMLResponse)
@@ -231,7 +232,7 @@ async def action_charger_update(request: Request, cp_id: str):
             <script>setTimeout(() => { closeModal('modal-charger-edit'); location.href=location.pathname+"?t="+Date.now(); }, 1200);</script>
         ''')
     except Exception as e:
-        return HTMLResponse(f'<div class="p-3 bg-red-900/50 border border-red-800 rounded text-red-300 text-sm">Error: {e}</div>')
+        return HTMLResponse(f'<div class="p-3 bg-red-900/50 border border-red-800 rounded text-red-300 text-sm">Error: {_html.escape(str(e))}</div>')
 
 
 @router.post("/action/charger/delete/{cp_id}", response_class=HTMLResponse)
@@ -246,7 +247,7 @@ async def action_charger_delete(request: Request, cp_id: str):
             <script>setTimeout(() => location.href=location.pathname+"?t="+Date.now(), 1200);</script>
         ''')
     except Exception as e:
-        return HTMLResponse(f'<div class="p-3 bg-red-900/50 border border-red-800 rounded text-red-300 text-sm">Error: {e}</div>')
+        return HTMLResponse(f'<div class="p-3 bg-red-900/50 border border-red-800 rounded text-red-300 text-sm">Error: {_html.escape(str(e))}</div>')
 
 
 @router.post("/action/charger/purge-virtual", response_class=HTMLResponse)
@@ -257,12 +258,12 @@ async def action_charger_purge_virtual(request: Request):
         deleted = result.get("deleted", 0)
         return HTMLResponse(f'''
             <div class="p-3 bg-yellow-900/50 border border-yellow-800 rounded text-yellow-300 text-sm">
-                🗑 {deleted} virtual charger(s) deleted
+                🗑 {_html.escape(str(deleted))} virtual charger(s) deleted
             </div>
             <script>setTimeout(() => location.href=location.pathname+"?t="+Date.now(), 1500);</script>
         ''')
     except Exception as e:
-        return HTMLResponse(f'<div class="p-3 bg-red-900/50 border border-red-800 rounded text-red-300 text-sm">Error: {e}</div>')
+        return HTMLResponse(f'<div class="p-3 bg-red-900/50 border border-red-800 rounded text-red-300 text-sm">Error: {_html.escape(str(e))}</div>')
 
 
 # ── Remote OCPP commands ──────────────────────────────────────────────────────
@@ -273,8 +274,8 @@ async def action_start(cp_id: str, request: Request):
     result = await api(f"/chargers/{cp_id}/start", method="POST", json={"connector_id": connector, "id_tag": "REMOTE"})
     status = result.get("status", result.get("detail", "Error"))
     if "detail" in result:
-        return HTMLResponse(f'<span class="text-red-400">✗ {status}</span>')
-    return HTMLResponse(f'<span class="text-green-400">✓ {status}</span>')
+        return HTMLResponse(f'<span class="text-red-400">✗ {_html.escape(str(status))}</span>')
+    return HTMLResponse(f'<span class="text-green-400">✓ {_html.escape(str(status))}</span>')
 
 
 @router.post("/action/stop/{cp_id}", response_class=HTMLResponse)
@@ -284,8 +285,8 @@ async def action_stop(cp_id: str, request: Request):
     result = await api(f"/chargers/{cp_id}/stop{qs}", method="POST")
     status = result.get("status", result.get("detail", "Error"))
     if "detail" in result:
-        return HTMLResponse(f'<span class="text-red-400">✗ {status}</span>')
-    return HTMLResponse(f'<span class="text-yellow-400">⏹ {status}</span>')
+        return HTMLResponse(f'<span class="text-red-400">✗ {_html.escape(str(status))}</span>')
+    return HTMLResponse(f'<span class="text-yellow-400">⏹ {_html.escape(str(status))}</span>')
 
 
 @router.post("/action/reset/{cp_id}", response_class=HTMLResponse)
@@ -294,16 +295,19 @@ async def action_reset(cp_id: str, request: Request):
     result = await api(f"/chargers/{cp_id}/reset?reset_type={reset_type}", method="POST")
     status = result.get("status", result.get("detail", "Error"))
     if "detail" in result:
-        return HTMLResponse(f'<span class="text-red-400">✗ {status}</span>')
-    return HTMLResponse(f'<span class="text-blue-400">↻ {status}</span>')
+        return HTMLResponse(f'<span class="text-red-400">✗ {_html.escape(str(status))}</span>')
+    return HTMLResponse(f'<span class="text-blue-400">↻ {_html.escape(str(status))}</span>')
 
 
 @router.post("/action/getconfig/{cp_id}", response_class=HTMLResponse)
 async def action_getconfig(cp_id: str, request: Request):
-    result = await api(f"/chargers/{cp_id}/command", method="POST", json={"action": "GetConfiguration", "payload": {"key": []}})
+    try:
+        result = await api(f"/chargers/{cp_id}/command", method="POST", json={"action": "GetConfiguration", "payload": {"key": []}})
+    except Exception as e:
+        return HTMLResponse(f'<span class="text-red-400">✗ {_html.escape(str(e))}</span>')
     if "detail" in result:
-        return HTMLResponse(f'<span class="text-red-400">✗ {result["detail"]}</span>')
-    return HTMLResponse(f'<span class="text-green-400">✓ GetConfiguration sent (msg_id: {result.get("msg_id", "?")})</span>')
+        return HTMLResponse(f'<span class="text-red-400">✗ {_html.escape(str(result["detail"]))}</span>')
+    return HTMLResponse(f'<span class="text-green-400">✓ GetConfiguration sent (msg_id: {_html.escape(str(result.get("msg_id", "?")))})</span>')
 
 
 @router.post("/action/command/{cp_id}")
