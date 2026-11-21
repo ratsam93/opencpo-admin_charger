@@ -84,13 +84,13 @@ async def ocpi_test_partial(request: Request, partner_id: int):
         ) or "—"
         return HTMLResponse(
             f'<span style="color:#84BD00;font-size:12px;">'
-            f'Connected — {ms} ms &nbsp;&middot;&nbsp; versions: {_html.escape(versions)}'
+            f'Connected — {_html.escape(str(ms))} ms &nbsp;&middot;&nbsp; versions: {_html.escape(versions)}'
             f'</span>'
         )
     else:
         err = _html.escape(result.get("error", "Unknown error"))
         code = result.get("status_code", "")
-        detail = f" (HTTP {code})" if code else ""
+        detail = f" (HTTP {_html.escape(str(code))})" if code else ""
         return HTMLResponse(
             f'<span style="color:#ef4444;font-size:12px;">Failed{detail}: {err}</span>'
         )

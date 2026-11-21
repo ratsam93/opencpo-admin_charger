@@ -53,7 +53,7 @@ async def tariff_edit_partial(request: Request, tariff_id: str):
         <h3 class="font-semibold text-gray-100">✏️ Edit {_html.escape(t["name"])}</h3>
         <button onclick="closeModal('modal-edit')" class="text-gray-500 hover:text-gray-300 text-xl">✕</button>
     </div>
-    <form hx-post="/action/tariff/update/{t["id"]}"
+    <form hx-post="/action/tariff/update/{_html.escape(str(t["id"]), quote=True)}"
           hx-target="#edit-result"
           hx-swap="innerHTML"
           class="space-y-4">
@@ -65,40 +65,40 @@ async def tariff_edit_partial(request: Request, tariff_id: str):
             </div>
             <div>
                 <label class="block text-xs text-gray-400 mb-1">Energy Rate (€/kWh)</label>
-                <input name="energy_rate" type="number" step="0.0001" min="0" value="{t.get("energy_rate") or 0}" required
+                <input name="energy_rate" type="number" step="0.0001" min="0" value="{_html.escape(str(t.get("energy_rate") or 0), quote=True)}" required
                     class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm font-mono">
             </div>
             <div>
                 <label class="block text-xs text-gray-400 mb-1">Time Rate (€/min)</label>
-                <input name="time_rate" type="number" step="0.0001" min="0" value="{t.get("time_rate") or 0}"
+                <input name="time_rate" type="number" step="0.0001" min="0" value="{_html.escape(str(t.get("time_rate") or 0), quote=True)}"
                     class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm font-mono">
             </div>
             <div>
                 <label class="block text-xs text-gray-400 mb-1">Idle Rate (€/min)</label>
-                <input name="idle_rate" type="number" step="0.0001" min="0" value="{t.get("idle_rate") or 0}"
+                <input name="idle_rate" type="number" step="0.0001" min="0" value="{_html.escape(str(t.get("idle_rate") or 0), quote=True)}"
                     class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm font-mono">
             </div>
             <div>
                 <label class="block text-xs text-gray-400 mb-1">Start Fee (€)</label>
-                <input name="flat_fee" type="number" step="0.01" min="0" value="{t.get("flat_fee") or 0}"
+                <input name="flat_fee" type="number" step="0.01" min="0" value="{_html.escape(str(t.get("flat_fee") or 0), quote=True)}"
                     class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm font-mono">
             </div>
             <div>
                 <label class="block text-xs text-gray-400 mb-1">Valid From</label>
-                <input name="valid_from" type="datetime-local" value="{vf}"
+                <input name="valid_from" type="datetime-local" value="{_html.escape(vf, quote=True)}"
                     class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm">
             </div>
             <div>
                 <label class="block text-xs text-gray-400 mb-1">Valid Until</label>
-                <input name="valid_until" type="datetime-local" value="{vu}"
+                <input name="valid_until" type="datetime-local" value="{_html.escape(vu, quote=True)}"
                     class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm">
             </div>
         </div>
         <div id="edit-result"></div>
         <div class="flex gap-3 pt-2">
             <button type="button"
-                hx-post="/action/tariff/delete/{t["id"]}"
-                hx-confirm="Delete tariff '{t["name"]}'?"
+                hx-post="/action/tariff/delete/{_html.escape(str(t["id"]), quote=True)}"
+                hx-confirm="Delete tariff '{_html.escape(str(t["name"]), quote=True)}'?"
                 hx-target="#edit-result"
                 hx-swap="innerHTML"
                 class="px-4 py-2 bg-red-900/40 hover:bg-red-900/70 text-red-300 border border-red-800 rounded-lg text-sm transition-colors">

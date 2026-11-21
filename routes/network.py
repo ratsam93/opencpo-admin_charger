@@ -1,4 +1,5 @@
 """Network & Sites — Tailscale zero-trust network management page."""
+import html as _html
 import logging
 
 from fastapi import APIRouter, Request
@@ -77,7 +78,7 @@ async def action_generate_key(request: Request):
         Run this command on your device. It installs Tailscale and connects it to your network.
         The key expires in 1 hour and can only be used once.
     </p>
-    <div class="bg-gray-950 border border-gray-700 rounded-lg p-3 font-mono text-xs text-green-400 overflow-x-auto whitespace-pre-wrap break-all" id="install-cmd">{command}</div>
+    <div class="bg-gray-950 border border-gray-700 rounded-lg p-3 font-mono text-xs text-green-400 overflow-x-auto whitespace-pre-wrap break-all" id="install-cmd">{_html.escape(str(command))}</div>
     <button type="button"
             onclick="navigator.clipboard.writeText(document.getElementById('install-cmd').textContent.trim())"
             class="px-3 py-1.5 text-xs bg-gray-700 hover:bg-gray-600 rounded text-gray-200 transition-colors">
@@ -91,7 +92,7 @@ async def action_generate_key(request: Request):
     except Exception as exc:
         return HTMLResponse(
             f'<div class="p-3 bg-red-900/50 border border-red-800 rounded text-red-300 text-sm">'
-            f'Failed to generate key: {str(exc)}'
+            f'Failed to generate key: {_html.escape(str(exc))}'
             f'</div>'
         )
 
@@ -111,7 +112,7 @@ async def action_check_connected(request: Request):
                 f'<div class="p-4 bg-green-900/40 border border-green-700 rounded-lg">'
                 f'<p class="text-green-300 font-semibold text-sm">Site connected.</p>'
                 f'<p class="text-green-400 text-xs mt-1">'
-                f'{count} node(s) online: {names}. '
+                f'{count} node(s) online: {_html.escape(names)}. '
                 f'Your chargers at this location can now reach the OCPP server.'
                 f'</p>'
                 f'</div>'
@@ -130,5 +131,5 @@ async def action_check_connected(request: Request):
 
     except Exception as exc:
         return HTMLResponse(
-            f'<div class="text-yellow-400 text-sm">Could not check status: {str(exc)}</div>'
+            f'<div class="text-yellow-400 text-sm">Could not check status: {_html.escape(str(exc))}</div>'
         )

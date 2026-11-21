@@ -38,7 +38,13 @@ templates.env.globals["compliance_url"] = COMPLIANCE_URL
 templates.env.globals["core_api_public_url"] = CORE_API_PUBLIC_URL
 
 # ── Local JWT verification (avoids calling core /me on every request) ─────
-_JWT_SECRET = os.getenv("JWT_SECRET", os.getenv("CORE_API_KEY", ""))
+_JWT_SECRET = os.getenv("JWT_SECRET") or os.getenv("CORE_API_KEY") or ""
+if not _JWT_SECRET:
+    raise RuntimeError(
+        "Refusing to start: neither JWT_SECRET nor CORE_API_KEY is set. "
+        "Set JWT_SECRET (must match the OCPP Core signing secret; compose sets it "
+        "to MANAGEMENT_API_KEY) or CORE_API_KEY."
+    )
 _JWT_ALGO = "HS256"
 
 
@@ -58,15 +64,22 @@ def _verify_token_local(token: str) -> dict | None:
         return None
 
 
-async def get_setup_status() -> dict:
-    """Check if the platform has been configured (first-time setup)."""
+async def get_setup_status(strict: bool = False) -> dict:
+    """Check if the platform has been configured (first-time setup).
+
+    With strict=True, raise if core cannot be reached / answers non-200
+    instead of reporting "not complete".
+    """
     try:
         async with httpx.AsyncClient(base_url=CORE_API, timeout=5) as client:
             r = await client.get("/api/v1/admin/setup/status")
             if r.status_code == 200:
                 return r.json()
+            if strict:
+                raise RuntimeError(f"core setup status returned {r.status_code}")
     except Exception:
-        pass
+        if strict:
+            raise
     return {"complete": False, "steps": {}}
 
 

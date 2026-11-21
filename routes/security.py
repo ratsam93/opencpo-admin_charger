@@ -1,4 +1,5 @@
 """Security dashboard, feature flags, and OCPP message viewer."""
+import html as _html
 from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse
 
@@ -47,19 +48,19 @@ def _flag_card_html(flag: dict) -> str:
     status_text = "Active" if enabled else "Disabled"
     status_color = "text-green-400" if enabled else "text-gray-500"
 
-    return f'''<div id="flag-{key}" class="relative rounded-xl border-l-4 {border_color} {bg_color} border border-gray-800 p-4 flex flex-col gap-2 transition-all">
+    return f'''<div id="flag-{_html.escape(str(key), quote=True)}" class="relative rounded-xl border-l-4 {border_color} {bg_color} border border-gray-800 p-4 flex flex-col gap-2 transition-all">
     <div class="flex items-start justify-between gap-3">
         <div class="flex-1 min-w-0">
-            <div class="font-semibold text-gray-100 text-sm">{label}</div>
-            <div class="font-mono text-xs text-gray-500 mt-0.5">{key}</div>
-            {f'<div class="text-xs text-gray-400 mt-1">{desc}</div>' if desc else ''}
+            <div class="font-semibold text-gray-100 text-sm">{_html.escape(str(label))}</div>
+            <div class="font-mono text-xs text-gray-500 mt-0.5">{_html.escape(str(key))}</div>
+            {f'<div class="text-xs text-gray-400 mt-1">{_html.escape(str(desc))}</div>' if desc else ''}
         </div>
         <button
-            hx-post="/action/feature/toggle/{key}"
-            hx-target="#flag-{key}"
+            hx-post="/action/feature/toggle/{_html.escape(str(key), quote=True)}"
+            hx-target="#flag-{_html.escape(str(key), quote=True)}"
             hx-swap="outerHTML"
             class="flex-shrink-0 mt-0.5 focus:outline-none"
-            title="Toggle {label}">
+            title="Toggle {_html.escape(str(label), quote=True)}">
             <div class="relative inline-flex items-center cursor-pointer">
                 <div class="w-10 h-5 rounded-full {toggle_track} transition-colors"></div>
                 <div class="absolute left-0.5 top-0.5 w-4 h-4 bg-white rounded-full shadow transform transition-transform {toggle_dot_pos}"></div>
@@ -78,4 +79,4 @@ async def action_feature_toggle(key: str):
         flag = await api(f"/features/{key}")
         return HTMLResponse(_flag_card_html(flag))
     except Exception as e:
-        return HTMLResponse(f'<div id="flag-{key}" class="p-4 rounded-xl border border-red-800 bg-red-900/20 text-red-400 text-sm">Error: {e}</div>')
+        return HTMLResponse(f'<div id="flag-{_html.escape(str(key), quote=True)}" class="p-4 rounded-xl border border-red-800 bg-red-900/20 text-red-400 text-sm">Error: {_html.escape(str(e))}</div>')

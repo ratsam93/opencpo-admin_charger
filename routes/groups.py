@@ -1,4 +1,5 @@
 """Group management and member management."""
+import html as _html
 from datetime import datetime
 
 import httpx
@@ -31,7 +32,9 @@ async def group_detail_page(request: Request, group_id: str):
     except Exception:
         return HTMLResponse('<div class="p-6 text-red-400">Group not found</div>', status_code=404)
 
-    group = data["group"]
+    group = data.get("group") if isinstance(data, dict) else None
+    if not group or "id" not in group:
+        return HTMLResponse('<div class="p-6 text-red-400">Group not found or unexpected response from core</div>', status_code=404)
     real_group_id = group["id"]
 
     # Get members (driver accounts in this group)
@@ -45,8 +48,8 @@ async def group_detail_page(request: Request, group_id: str):
     try:
         all_data = await api("/driver-accounts?limit=200")
         all_accounts = all_data.get("accounts", [])
-        member_ids = {m["id"] for m in members}
-        available_accounts = [a for a in all_accounts if a["id"] not in member_ids and not a.get("group_id")]
+        member_ids = {m.get("id") for m in members}
+        available_accounts = [a for a in all_accounts if a.get("id") not in member_ids and not a.get("group_id")]
     except Exception:
         available_accounts = []
 
@@ -117,7 +120,10 @@ async def group_invoice_download(request: Request, group_id: str, month: str = N
     headers = {"X-API-Key": CORE_API_KEY} if CORE_API_KEY else {}
     async with httpx.AsyncClient(base_url=CORE_API, timeout=30, headers=headers) as client:
         r = await client.get(f"/api/v1/groups/{group_id}/invoice?month={month}")
-        r.raise_for_status()
+    if r.status_code == 404:
+        return HTMLResponse("No invoice for this group and month.", status_code=404)
+    if not r.is_success:
+        return HTMLResponse("The invoice could not be generated right now.", status_code=502)
     return Response(
         content=r.content,
         media_type="application/pdf",
@@ -141,7 +147,7 @@ async def action_group_create(request: Request):
         await api("/groups", method="POST", json=body)
         return HTMLResponse('<div class="p-2 bg-green-900/50 text-green-300 rounded text-sm">✅ Group created</div>')
     except Exception as e:
-        return HTMLResponse(f'<div class="p-2 bg-red-900/50 text-red-300 rounded text-sm">Error: {e}</div>')
+        return HTMLResponse(f'<div class="p-2 bg-red-900/50 text-red-300 rounded text-sm">Error: {_html.escape(str(e))}</div>')
 
 
 @router.put("/action/group/update/{group_id}", response_class=HTMLResponse)
@@ -156,7 +162,7 @@ async def action_group_update(request: Request, group_id: str):
         await api(f"/groups/{group_id}", method="PUT", json=body)
         return HTMLResponse('<div class="p-2 bg-green-900/50 text-green-300 rounded text-sm">✅ Saved</div>')
     except Exception as e:
-        return HTMLResponse(f'<div class="p-2 bg-red-900/50 text-red-300 rounded text-sm">Error: {e}</div>')
+        return HTMLResponse(f'<div class="p-2 bg-red-900/50 text-red-300 rounded text-sm">Error: {_html.escape(str(e))}</div>')
 
 
 @router.post("/action/group/{group_id}/add-member", response_class=HTMLResponse)
@@ -170,7 +176,7 @@ async def action_add_member(request: Request, group_id: str):
         await api(f"/driver-accounts/{account_id}", method="PUT", json={"group_id": group_id})
         return HTMLResponse('<span class="text-green-400 text-xs">✓ Member added</span><script>setTimeout(()=>location.reload(),800)</script>')
     except Exception as e:
-        return HTMLResponse(f'<span class="text-red-400 text-xs">Error: {e}</span>')
+        return HTMLResponse(f'<span class="text-red-400 text-xs">Error: {_html.escape(str(e))}</span>')
 
 
 @router.post("/action/group/{group_id}/remove-member", response_class=HTMLResponse)
@@ -183,7 +189,7 @@ async def action_remove_member(request: Request, group_id: str):
         await api(f"/driver-accounts/{account_id}", method="PUT", json={"group_id": ""})
         return HTMLResponse('<span class="text-green-400 text-xs">✓ Member removed</span><script>setTimeout(()=>location.reload(),800)</script>')
     except Exception as e:
-        return HTMLResponse(f'<span class="text-red-400 text-xs">Error: {e}</span>')
+        return HTMLResponse(f'<span class="text-red-400 text-xs">Error: {_html.escape(str(e))}</span>')
 
 
 @router.delete("/action/group/delete/{group_id}", response_class=HTMLResponse)
@@ -192,4 +198,4 @@ async def action_group_delete(request: Request, group_id: str):
         await api(f"/groups/{group_id}", method="DELETE")
         return HTMLResponse('<div class="p-2 bg-yellow-900/50 text-yellow-300 rounded text-sm">🗑 Group deleted</div><script>setTimeout(()=>location.href=location.pathname+"?t="+Date.now(),1000)</script>')
     except Exception as e:
-        return HTMLResponse(f'<div class="p-2 bg-red-900/50 text-red-300 rounded text-sm">Error: {e}</div>')
+        return HTMLResponse(f'<div class="p-2 bg-red-900/50 text-red-300 rounded text-sm">Error: {_html.escape(str(e))}</div>')
